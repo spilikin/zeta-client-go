@@ -1,4 +1,4 @@
-package main
+package zeta_test
 
 import (
 	"encoding/json"
@@ -11,17 +11,17 @@ import (
 	zeta "github.com/gematik/zeta-client-go"
 )
 
-func newStorage(t *testing.T) *jsonFileStorage {
+func newFileStorage(t *testing.T) *zeta.FileStorage {
 	t.Helper()
-	s, err := openStorage(filepath.Join(t.TempDir(), "default.storage.json"))
+	s, err := zeta.OpenFileStorage(filepath.Join(t.TempDir(), "default.storage.json"))
 	if err != nil {
-		t.Fatalf("openStorage: %v", err)
+		t.Fatalf("OpenFileStorage: %v", err)
 	}
 	return s
 }
 
-func TestStorage_PutGetRoundtrip(t *testing.T) {
-	s := newStorage(t)
+func TestFileStorage_PutGetRoundtrip(t *testing.T) {
+	s := newFileStorage(t)
 	if err := s.Put("k1", "v1"); err != nil {
 		t.Fatalf("put: %v", err)
 	}
@@ -31,19 +31,19 @@ func TestStorage_PutGetRoundtrip(t *testing.T) {
 	}
 }
 
-func TestStorage_GetMissingReturnsErrNotFound(t *testing.T) {
-	s := newStorage(t)
+func TestFileStorage_GetMissingReturnsErrNotFound(t *testing.T) {
+	s := newFileStorage(t)
 	_, err := s.Get("nope")
 	if !errors.Is(err, zeta.ErrNotFound) {
 		t.Fatalf("expected zeta.ErrNotFound, got %v", err)
 	}
 }
 
-func TestStorage_PersistAcrossInstances(t *testing.T) {
+func TestFileStorage_PersistAcrossInstances(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "default.storage.json")
-	a, _ := openStorage(path)
+	a, _ := zeta.OpenFileStorage(path)
 	_ = a.Put("k", "persistent")
-	b, err := openStorage(path)
+	b, err := zeta.OpenFileStorage(path)
 	if err != nil {
 		t.Fatalf("reopen: %v", err)
 	}
@@ -55,9 +55,9 @@ func TestStorage_PersistAcrossInstances(t *testing.T) {
 
 // On-disk format must match zeta-cli's JsonFileStorage so the same file is
 // interoperable: flat {"key": "value"} JSON, 2-space indent, pretty-printed.
-func TestStorage_OnDiskFormatMatchesZetaCli(t *testing.T) {
+func TestFileStorage_OnDiskFormatMatchesZetaCli(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "default.storage.json")
-	s, _ := openStorage(path)
+	s, _ := zeta.OpenFileStorage(path)
 	_ = s.Put("alpha", "1")
 	_ = s.Put("beta", "two")
 
@@ -72,10 +72,9 @@ func TestStorage_OnDiskFormatMatchesZetaCli(t *testing.T) {
 	if decoded["alpha"] != "1" || decoded["beta"] != "two" || len(decoded) != 2 {
 		t.Errorf("on-disk JSON wrong: %+v", decoded)
 	}
-	// Pretty-printed with 2-space indent — zeta-cli uses prettyPrintIndent = "  ".
 	lines := strings.Split(string(raw), "\n")
 	if len(lines) < 4 {
-		t.Errorf("expected pretty-printed output (≥4 lines), got %d:\n%s", len(lines), raw)
+		t.Errorf("expected pretty-printed output (>=4 lines), got %d:\n%s", len(lines), raw)
 	}
 	for _, line := range lines {
 		if strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "  ") {
@@ -84,8 +83,8 @@ func TestStorage_OnDiskFormatMatchesZetaCli(t *testing.T) {
 	}
 }
 
-func TestStorage_RemoveThenGet(t *testing.T) {
-	s := newStorage(t)
+func TestFileStorage_RemoveThenGet(t *testing.T) {
+	s := newFileStorage(t)
 	_ = s.Put("k", "v")
 	if err := s.Remove("k"); err != nil {
 		t.Fatalf("remove: %v", err)
@@ -95,8 +94,8 @@ func TestStorage_RemoveThenGet(t *testing.T) {
 	}
 }
 
-func TestStorage_Clear(t *testing.T) {
-	s := newStorage(t)
+func TestFileStorage_Clear(t *testing.T) {
+	s := newFileStorage(t)
 	_ = s.Put("a", "1")
 	_ = s.Put("b", "2")
 	if err := s.Clear(); err != nil {
@@ -107,25 +106,14 @@ func TestStorage_Clear(t *testing.T) {
 	}
 }
 
-func TestStorage_SatisfiesZetaStorage(_ *testing.T) {
-	var _ zeta.Storage = (*jsonFileStorage)(nil)
+func TestFileStorage_SatisfiesZetaStorage(_ *testing.T) {
+	var _ zeta.Storage = (*zeta.FileStorage)(nil)
 }
 
-func TestProfilePath_SegregatesNativeFromZetaCli(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", "/tmp/fake-xdg")
-	got := profilePath("myprof")
-	want := "/tmp/fake-xdg/telematik/zeta/myprof.native.storage.json"
-	if got != want {
-		t.Errorf("profilePath(%q) = %q, want %q", "myprof", got, want)
-	}
-}
-
-func TestXdgConfigHome_FallsBackToHome(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", "")
-	got := xdgConfigHome()
-	home, _ := os.UserHomeDir()
-	want := filepath.Join(home, ".config")
-	if got != want {
-		t.Errorf("xdgConfigHome() = %q, want %q", got, want)
+func TestFileStorage_Path(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "p.storage.json")
+	s, _ := zeta.OpenFileStorage(path)
+	if s.Path() != path {
+		t.Errorf("Path() = %q, want %q", s.Path(), path)
 	}
 }

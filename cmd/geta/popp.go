@@ -67,7 +67,7 @@ func runPoppKartos(args []string) error {
 	}
 	resourceOrigin := "https://" + parsed.Host + "/"
 
-	storage, err := openStorage(profilePath(cf.profile))
+	storage, err := zeta.OpenFileStorage(profilePath(cf.profile))
 	if err != nil {
 		return fmt.Errorf("open storage: %w", err)
 	}

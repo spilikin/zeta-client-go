@@ -275,7 +275,7 @@ func withClient(fs *flag.FlagSet, args []string, fn func(ctx context.Context, c 
 	if err := cf.validate(); err != nil {
 		return err
 	}
-	storage, err := openStorage(profilePath(cf.profile))
+	storage, err := zeta.OpenFileStorage(profilePath(cf.profile))
 	if err != nil {
 		return fmt.Errorf("open storage: %w", err)
 	}
@@ -411,7 +411,7 @@ func runHTTP(args []string) error {
 		requestPath += "?" + parsed.RawQuery
 	}
 
-	storage, err := openStorage(profilePath(cf.profile))
+	storage, err := zeta.OpenFileStorage(profilePath(cf.profile))
 	if err != nil {
 		return fmt.Errorf("open storage: %w", err)
 	}
@@ -519,7 +519,7 @@ func runWS(args []string) error {
 		hdrs["PoPP"] = []string{poppToken}
 	}
 
-	storage, err := openStorage(profilePath(cf.profile))
+	storage, err := zeta.OpenFileStorage(profilePath(cf.profile))
 	if err != nil {
 		return fmt.Errorf("open storage: %w", err)
 	}
