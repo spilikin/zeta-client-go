@@ -1,16 +1,16 @@
 # zeta-client-go
 
-Go bindings for the [ZETA Client SDK](https://github.com/gematik/zeta-sdk) — a Kotlin Multiplatform library shipped as a Kotlin/Native shared library with a C ABI. Includes a CLI (`geta`) that mirrors the p12-auth lifecycle subset of [`zeta-cli`](https://github.com/gematik/zeta-cli).
+Go bindings for the [ZETA Client SDK](https://github.com/gematik/zeta-sdk) — a Kotlin Multiplatform library shipped as a Kotlin/Native shared library with a C ABI. Includes a CLI (`geta`) covering the p12-auth lifecycle.
 
 Status: experimental. Targets macOS (arm64); Linux + Windows (amd64) static builds are scaffolded.
 
 This project was developed with the assistance of AI-based coding tools.
 
-## 15-minute quick start
+## Quick start
 
 Zero-to-working binding in three phases. Verified end-to-end on macOS arm64; the same flow applies to Linux amd64 and Windows amd64 with the platform-appropriate C toolchain.
 
-### 1. Prerequisites (2 min)
+### 1. Prerequisites
 
 - **Go 1.26 or newer** (`go version`).
 - **A supported host**: macOS arm64, Linux amd64, or Windows amd64.
@@ -21,7 +21,7 @@ Zero-to-working binding in three phases. Verified end-to-end on macOS arm64; the
 - **Internet access** for `go get` and the one-time SDK archive download.
 - (Optional, for actual ZETA-protected calls) an SMC-B p12 keystore and a reachable ZETA-protected resource server.
 
-### 2. Install + fetch SDK archives (3 min)
+### 2. Install + fetch SDK archives
 
 ```sh
 mkdir zeta-demo && cd zeta-demo
@@ -37,7 +37,7 @@ Environment overrides (for forks, mirrors, air-gapped builds):
 - `ZETA_SDK_REPO` — overrides the upstream-repo path. Default: read from `internal/sdk/prebuilt/REPO` inside the module.
 - `ZETA_SDK_MANIFEST_URL` — full URL pattern override (supports `{version}` and `{tarball}` placeholders) for mirrors.
 
-### 3. First program: full login (10 min)
+### 3. First program: full login
 
 A `zeta.Storage` is **required** to construct a client. The binding ships `zeta.FileStorage`, a flat-JSON file-backed implementation suitable for development and small production deployments. Save the following as `main.go`:
 
@@ -155,7 +155,7 @@ Profile state lives at:
 $XDG_CONFIG_HOME/telematik/zeta/<profile>.native.storage.json
 ```
 
-The `.native` infix segregates `geta`'s files from the JVM-based `zeta-cli`'s files (`<profile>.storage.json`) — the Kotlin/Native and Kotlin/JVM targets store EC keys in incompatible formats under the same PEM labels. Sharing a file across the two tools causes `OPENSSL: invalid encoding` crashes.
+The `.native` infix segregates `geta`'s files from any JVM-based ZETA client's storage at `<profile>.storage.json` — the Kotlin/Native and Kotlin/JVM targets store EC keys in incompatible formats under the same PEM labels, and sharing a file across the two would trigger `OPENSSL: invalid encoding` crashes.
 
 ## License
 
