@@ -1,0 +1,5 @@
+# SHA256 checksums of per-target tarballs on the upstream SDK release.
+# Format: BSD-style (`shasum -a 256 file`); one line per tarball.
+# Populated by the release-pipeline workflow after a tagged SDK build.
+5c3c1fd2c6a11b733b71e21ae0fd89d9c0d664355424881b25e7b4d897dc449e  libzeta_sdk-darwin-arm64-v0.0.1.tar.gz
+4dd21acfeeacaeac5250fadbe7cc317fadfba82a93592c6d02c2d1a0804f7af4  libzeta_sdk-windows-amd64-v0.0.1.tar.gz

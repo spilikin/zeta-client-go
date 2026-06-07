@@ -1,0 +1,44 @@
+version: "2"
+
+run:
+  build-tags:
+    - e2e
+  timeout: 5m
+
+linters:
+  default: standard
+  enable:
+    - gosec
+    - revive
+  settings:
+    errcheck:
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintln
+        - fmt.Fprintf
+        - (io.Closer).Close
+        - (*os.File).Close
+  exclusions:
+    rules:
+      # cgo glue: cgo struct fields and //export functions trigger false-positive
+      # complaints from linters that can't see through the C boundary.
+      - path: internal/sdk/
+        linters:
+          - gosec   # G103: unsafe.Pointer is intrinsic to cgo here.
+          - revive  # unused-parameter / var-naming: cgo callbacks have fixed shapes.
+      # e2e tests deliberately wire long-running clients with .Close in defer at
+      # the function tail; errcheck on Close is noise there.
+      - path: _e2e_test\.go
+        linters:
+          - errcheck
+      # env-var name constants trip gosec's hardcoded-credentials heuristic.
+      - path: (e2e_helpers|.*_e2e)_test\.go
+        text: G101
+      # CLI is intentionally driven by user input (file paths, subprocess args).
+      - path: cmd/geta/
+        text: 'G(204|304)'
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports

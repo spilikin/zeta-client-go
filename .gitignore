@@ -1,0 +1,24 @@
+/bin/
+/dist/
+.cache/
+
+# editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# go
+/geta
+*.test
+*.out
+coverage.txt
+
+# secrets / local-only
+.env*
+!.env.sample
+
+# native artefacts fetched via `go generate` — never committed
+# scaffolding files (REPO, VERSION, CHECKSUMS.txt, doc.go) at prebuilt/ root stay tracked
+/internal/sdk/prebuilt/*/
+/fetch-prebuilts
