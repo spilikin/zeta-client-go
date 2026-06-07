@@ -8,14 +8,18 @@ This project was developed with the assistance of AI-based coding tools.
 
 ## 15-minute quick start
 
-Zero-to-working binding in three phases.
+Zero-to-working binding in three phases. Verified end-to-end on macOS arm64; the same flow applies to Linux amd64 and Windows amd64 with the platform-appropriate C toolchain.
 
 ### 1. Prerequisites (2 min)
 
-- Go 1.26 or newer (`go version`)
-- A supported host: macOS arm64, Linux amd64, or Windows amd64
-- Internet access for `go get` and the one-time SDK archive download
-- (Optional, for actual ZETA-protected calls) An SMC-B p12 keystore and access to a resource server
+- **Go 1.26 or newer** (`go version`).
+- **A supported host**: macOS arm64, Linux amd64, or Windows amd64.
+- **A C compiler** — required by cgo. The binding does not work without one.
+  - **macOS**: Xcode Command Line Tools (`xcode-select --install`, then verify with `cc --version`).
+  - **Linux**: `gcc` or `clang` (`apt-get install build-essential`, `dnf install gcc`, etc.).
+  - **Windows**: `mingw-w64` (cgo requires a GCC-style toolchain; MSVC is not supported).
+- **Internet access** for `go get` and the one-time SDK archive download.
+- (Optional, for actual ZETA-protected calls) an SMC-B p12 keystore and a reachable ZETA-protected resource server.
 
 ### 2. Install + fetch SDK archives (3 min)
 
@@ -35,30 +39,88 @@ Environment overrides (for forks, mirrors, air-gapped builds):
 
 ### 3. First program (10 min)
 
-Save as `main.go`:
+A `zeta.Storage` is **required** to construct a client. The binding never falls back to a default implicit storage on the Go side. Save the following as `main.go` — it includes a minimal file-backed `zeta.Storage` (plaintext JSON next to the running program — wrap it with your own encryption layer for production):
 
 ```go
 package main
 
 import (
+    "encoding/json"
+    "errors"
     "fmt"
+    "io/fs"
     "log"
+    "os"
+    "sync"
 
     zeta "github.com/gematik/zeta-client-go"
 )
 
+// fileStorage is a minimal zeta.Storage that persists state as a flat JSON
+// map at `path`. Plaintext at rest — wrap with your own encryption layer
+// for production.
+type fileStorage struct {
+    mu   sync.Mutex
+    path string
+    kv   map[string]string
+}
+
+func openStorage(path string) (*fileStorage, error) {
+    s := &fileStorage{path: path, kv: map[string]string{}}
+    b, err := os.ReadFile(path)
+    if errors.Is(err, fs.ErrNotExist) || len(b) == 0 {
+        return s, nil
+    }
+    if err != nil {
+        return nil, err
+    }
+    return s, json.Unmarshal(b, &s.kv)
+}
+
+func (s *fileStorage) write() error {
+    b, err := json.MarshalIndent(s.kv, "", "  ")
+    if err != nil {
+        return err
+    }
+    return os.WriteFile(s.path, b, 0o600)
+}
+
+func (s *fileStorage) Put(k, v string) error {
+    s.mu.Lock(); defer s.mu.Unlock()
+    s.kv[k] = v; return s.write()
+}
+func (s *fileStorage) Get(k string) (string, error) {
+    s.mu.Lock(); defer s.mu.Unlock()
+    if v, ok := s.kv[k]; ok { return v, nil }
+    return "", zeta.ErrNotFound
+}
+func (s *fileStorage) Remove(k string) error {
+    s.mu.Lock(); defer s.mu.Unlock()
+    delete(s.kv, k); return s.write()
+}
+func (s *fileStorage) Clear() error {
+    s.mu.Lock(); defer s.mu.Unlock()
+    s.kv = map[string]string{}; return s.write()
+}
+
 func main() {
+    storage, err := openStorage("./demo.storage.json")
+    if err != nil {
+        log.Fatal(err)
+    }
+
     cfg := zeta.Config{
-        ResourceURL:    "https://your-resource-server.example.com",
+        ResourceURL:    "https://popp.dev.poppservice.de/",
         ProductID:      "demo",
         ProductVersion: "0.1.0",
         ClientName:     "demo-client",
-        Auth: &zeta.KeystoreAuth{
+        Auth: zeta.KeystoreAuth{
             File:     "/path/to/smcb.p12",
             Alias:    "alias",
             Password: "00",
         },
-        StorageAESKey: "<base64-encoded 32-byte AES key>",
+        Storage: storage,
+        Scopes:  []string{"popp"},
     }
     if err := cfg.Validate(); err != nil {
         log.Fatal("config invalid: ", err)
@@ -77,7 +139,11 @@ func main() {
 go build -o demo . && ./demo
 ```
 
-Seeing **binding linked OK; client built** confirms cgo linked the SDK successfully. From here, swap in real credentials and call `client.Discover(ctx)`, `client.Register(ctx)`, `client.Authenticate(ctx)`, then construct an `HTTPClient` and make ZETA-protected requests. See the `geta` CLI source under `cmd/geta/` for a complete worked example.
+Seeing **binding linked OK; client built** confirms cgo linked the SDK, the Storage implementation satisfies the binding's interface, and `NewClient` constructed a live client. The storage file (`demo.storage.json`) is created on first `Put()` — which happens once you start calling `client.Discover(ctx)`, `client.Register(ctx)`, `client.Authenticate(ctx)`. From there, construct an `HTTPClient` to make ZETA-protected requests. See the `geta` CLI source under `cmd/geta/` for a complete worked example.
+
+### About at-rest encryption
+
+The SDK passes **plaintext** state (access/refresh tokens, registration data) to any `zeta.Storage` implementation. The `fileStorage` above persists it as plaintext JSON. For production deployments, wrap your storage with your own AES-GCM (or equivalent) encryption layer between `Put`/`Get` and the persistent backend. The SDK's own per-platform encrypted backends are not reachable when supplying a custom `Storage`.
 
 ## The `geta` CLI
 
